@@ -1,0 +1,52 @@
+* snaplink.el
+=snaplink.el= uploads a local image path at point with =rclone= and
+replaces that path with a public URL in place.
+
+Supported link forms in v0.1:
+
+- Org: =[[./assets/a.png]]=
+- Markdown image: =![](./assets/a.png)=
+- Markdown link: =[](./assets/a.png)=
+
+Path rules:
+
+- Paths are interpreted relative to the current file.
+- =foo/bar.png= and =./foo/bar.png= are supported.
+- Any path containing =../= is rejected.
+- Absolute paths are rejected.
+
+** Configuration
+
+#+begin_src elisp
+(add-to-list 'load-path "~/labs/snaplink")
+(require 'snaplink)
+
+(setq snaplink-rclone-remote "r2:your-bucket"
+      snaplink-public-base-url "https://img.example.com")
+#+end_src
+
+Doom Emacs example:
+
+#+begin_src elisp
+(add-load-path! "~/labs/snaplink")
+(require 'snaplink)
+
+(map! :leader
+      :desc "Snap local image link"
+      "n u" #'snaplink-upload-at-point)
+#+end_src
+
+** Tests
+
+#+begin_src sh
+emacs -Q --batch \
+  -L . \
+  -l snaplink-test.el \
+  -f ert-run-tests-batch-and-exit
+#+end_src
+
+Byte compilation:
+
+#+begin_src sh
+emacs -Q --batch -L . -f batch-byte-compile snaplink.el
+#+end_src
