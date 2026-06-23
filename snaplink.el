@@ -57,7 +57,7 @@
   :type '(repeat string))
 
 (defconst snaplink--supported-link-patterns
-  '((org . "\\[\\[\\([^]\n]+\\)\\]\\]")
+  '((org . "\\[\\[\\([^]\n]+\\)\\]\\(?:\\[[^]\n]*\\]\\)?\\]")
     (markdown-image . "!\\[[^]\n]*\\](\\([^)\n]+\\))")
     (markdown-link . "\\[[^]\n]*\\](\\([^)\n]+\\))"))
   "Patterns used to detect supported link forms at point.")
@@ -71,9 +71,13 @@
                (not (string-empty-p snaplink-public-base-url)))
     (user-error "snaplink-public-base-url is not configured")))
 
-(defun snaplink--path-bounds-at-point ()
-  "Return the bounds of the supported path at point.
-The return value is a cons cell of buffer positions."
+(defun snaplink--normalize-org-target (target)
+  "Return TARGET without the Org `file:' prefix."
+  (string-remove-prefix "file:" target))
+
+(defun snaplink--path-context-at-point ()
+  "Return the supported link context at point.
+The return value is a plist with :bounds and :path."
   (save-excursion
     (let ((origin (point))
           (line-start (line-beginning-position))
@@ -84,18 +88,28 @@ The return value is a cons cell of buffer positions."
           (goto-char line-start)
           (while (and (not result)
                       (re-search-forward (cdr entry) line-end t))
-            (let ((beg (match-beginning 1))
-                  (end (match-end 1)))
+            (let* ((beg (match-beginning 1))
+                   (end (match-end 1))
+                   (raw-path (buffer-substring-no-properties beg end))
+                   (path (if (eq (car entry) 'org)
+                             (snaplink--normalize-org-target raw-path)
+                           raw-path)))
               (when (and (<= beg origin) (<= origin end))
-                (setq result (cons beg end)))))))
+                (setq result (list :bounds (cons beg end)
+                                   :path path)))))))
       result)))
+
+(defun snaplink--path-bounds-at-point ()
+  "Return the bounds of the supported path at point.
+The return value is a cons cell of buffer positions."
+  (plist-get (snaplink--path-context-at-point) :bounds))
 
 (defun snaplink--path-at-point ()
   "Return the local path at point."
-  (let ((bounds (snaplink--path-bounds-at-point)))
-    (unless bounds
+  (let ((context (snaplink--path-context-at-point)))
+    (unless context
       (user-error "Point is not on a supported local path"))
-    (buffer-substring-no-properties (car bounds) (cdr bounds))))
+    (plist-get context :path)))
 
 (defun snaplink--absolute-path-p (path)
   "Return non-nil when PATH is absolute."
@@ -159,9 +173,10 @@ The return value is a cons cell of buffer positions."
   "Upload the local image path at point and replace it with a public URL."
   (interactive)
   (snaplink--assert-configured)
-  (let* ((bounds (or (snaplink--path-bounds-at-point)
+  (let* ((context (or (snaplink--path-context-at-point)
                      (user-error "Point is not on a supported local path")))
-         (raw-path (buffer-substring-no-properties (car bounds) (cdr bounds))))
+         (bounds (plist-get context :bounds))
+         (raw-path (plist-get context :path)))
     (snaplink--validate-path raw-path)
     (snaplink--ensure-allowed-extension raw-path)
     (let* ((local-file (snaplink--resolve-local-file raw-path))

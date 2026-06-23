@@ -49,6 +49,24 @@
       (should (equal (buffer-substring-no-properties (car bounds) (cdr bounds))
                      "./assets/a.png")))))
 
+(ert-deftest snaplink-path-bounds-detect-org-file-link ()
+  (snaplink-test--with-temp-file-buffer "/tmp/post.org" "[[file:./assets/a.png]]"
+    (search-forward "assets")
+    (let ((bounds (snaplink--path-bounds-at-point)))
+      (should bounds)
+      (should (equal (buffer-substring-no-properties (car bounds) (cdr bounds))
+                     "file:./assets/a.png"))
+      (should (equal (snaplink--path-at-point) "./assets/a.png")))))
+
+(ert-deftest snaplink-path-bounds-detect-org-file-link-with-description ()
+  (snaplink-test--with-temp-file-buffer "/tmp/post.org" "[[file:./assets/a.png][desc]]"
+    (search-forward "assets")
+    (let ((bounds (snaplink--path-bounds-at-point)))
+      (should bounds)
+      (should (equal (buffer-substring-no-properties (car bounds) (cdr bounds))
+                     "file:./assets/a.png"))
+      (should (equal (snaplink--path-at-point) "./assets/a.png")))))
+
 (ert-deftest snaplink-path-bounds-detect-markdown-image-link ()
   (snaplink-test--with-temp-file-buffer "/tmp/post.md" "![](assets/a.png)"
     (search-forward "a.png")
@@ -66,7 +84,7 @@
                      "assets/a.png")))))
 
 (ert-deftest snaplink-path-bounds-requires-point-on-path ()
-  (snaplink-test--with-temp-file-buffer "/tmp/post.org" "[[./assets/a.png]]"
+  (snaplink-test--with-temp-file-buffer "/tmp/post.org" "[[file:./assets/a.png][desc]]"
     (goto-char (point-min))
     (should-not (snaplink--path-bounds-at-point))))
 
@@ -103,6 +121,40 @@
         (should (equal call-args
                        (list "rclone" nil (get-buffer-create "*snaplink-rclone*") t
                              "copyto" image "r2:bucket/assets/a.png")))))))
+
+(ert-deftest snaplink-upload-at-point-replaces-org-file-path-only ()
+  (let* ((dir (make-temp-file "snaplink-dir-" t))
+         (subdir (expand-file-name "assets" dir))
+         (post (expand-file-name "post.org" dir))
+         (image (expand-file-name "a.png" subdir))
+         (snaplink-rclone-remote "r2:bucket")
+         (snaplink-public-base-url "https://img.example.com")
+         (snaplink-allowed-extensions '("png")))
+    (make-directory subdir t)
+    (write-region "" nil image nil 'silent)
+    (cl-letf (((symbol-function 'process-file) (lambda (&rest _) 0)))
+      (snaplink-test--with-temp-file-buffer post "before [[file:./assets/a.png]] after"
+        (search-forward "assets")
+        (snaplink-upload-at-point)
+        (should (equal (buffer-string)
+                       "before [[https://img.example.com/assets/a.png]] after"))))))
+
+(ert-deftest snaplink-upload-at-point-replaces-org-file-path-with-description ()
+  (let* ((dir (make-temp-file "snaplink-dir-" t))
+         (subdir (expand-file-name "assets" dir))
+         (post (expand-file-name "post.org" dir))
+         (image (expand-file-name "a.png" subdir))
+         (snaplink-rclone-remote "r2:bucket")
+         (snaplink-public-base-url "https://img.example.com")
+         (snaplink-allowed-extensions '("png")))
+    (make-directory subdir t)
+    (write-region "" nil image nil 'silent)
+    (cl-letf (((symbol-function 'process-file) (lambda (&rest _) 0)))
+      (snaplink-test--with-temp-file-buffer post "before [[file:./assets/a.png][desc]] after"
+        (search-forward "assets")
+        (snaplink-upload-at-point)
+        (should (equal (buffer-string)
+                       "before [[https://img.example.com/assets/a.png][desc]] after"))))))
 
 (ert-deftest snaplink-upload-at-point-replaces-markdown-image-path-only ()
   (let* ((dir (make-temp-file "snaplink-dir-" t))
@@ -144,6 +196,18 @@
         (search-forward "assets")
         (should-error (snaplink-upload-at-point) :type 'user-error)
         (should (equal (buffer-string) "[[./assets/a.png]]"))))))
+
+(ert-deftest snaplink-upload-at-point-stops-on-missing-org-file-link ()
+  (let ((snaplink-rclone-remote "r2:bucket")
+        (snaplink-public-base-url "https://img.example.com")
+        (snaplink-allowed-extensions '("png")))
+    (cl-letf (((symbol-function 'process-file)
+               (lambda (&rest _)
+                 (ert-fail "process-file should not run"))))
+      (snaplink-test--with-temp-file-buffer "/tmp/post.org" "[[file:./assets/a.png][desc]]"
+        (search-forward "assets")
+        (should-error (snaplink-upload-at-point) :type 'user-error)
+        (should (equal (buffer-string) "[[file:./assets/a.png][desc]]"))))))
 
 (ert-deftest snaplink-upload-at-point-preserves-buffer-on-upload-failure ()
   (let* ((dir (make-temp-file "snaplink-dir-" t))
