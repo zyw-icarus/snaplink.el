@@ -67,6 +67,15 @@
                      "file:./assets/a.png"))
       (should (equal (snaplink--path-at-point) "./assets/a.png")))))
 
+(ert-deftest snaplink-path-bounds-detect-org-link-with-description ()
+  (snaplink-test--with-temp-file-buffer "/tmp/post.org" "[[./assets/a.png][desc]]"
+    (search-forward "assets")
+    (let ((bounds (snaplink--path-bounds-at-point)))
+      (should bounds)
+      (should (equal (buffer-substring-no-properties (car bounds) (cdr bounds))
+                     "./assets/a.png"))
+      (should (equal (snaplink--path-at-point) "./assets/a.png")))))
+
 (ert-deftest snaplink-path-bounds-detect-markdown-image-link ()
   (snaplink-test--with-temp-file-buffer "/tmp/post.md" "![](assets/a.png)"
     (search-forward "a.png")
@@ -151,6 +160,23 @@
     (write-region "" nil image nil 'silent)
     (cl-letf (((symbol-function 'process-file) (lambda (&rest _) 0)))
       (snaplink-test--with-temp-file-buffer post "before [[file:./assets/a.png][desc]] after"
+        (search-forward "assets")
+        (snaplink-upload-at-point)
+        (should (equal (buffer-string)
+                       "before [[https://img.example.com/assets/a.png][desc]] after"))))))
+
+(ert-deftest snaplink-upload-at-point-replaces-org-path-with-description ()
+  (let* ((dir (make-temp-file "snaplink-dir-" t))
+         (subdir (expand-file-name "assets" dir))
+         (post (expand-file-name "post.org" dir))
+         (image (expand-file-name "a.png" subdir))
+         (snaplink-rclone-remote "r2:bucket")
+         (snaplink-public-base-url "https://img.example.com")
+         (snaplink-allowed-extensions '("png")))
+    (make-directory subdir t)
+    (write-region "" nil image nil 'silent)
+    (cl-letf (((symbol-function 'process-file) (lambda (&rest _) 0)))
+      (snaplink-test--with-temp-file-buffer post "before [[./assets/a.png][desc]] after"
         (search-forward "assets")
         (snaplink-upload-at-point)
         (should (equal (buffer-string)

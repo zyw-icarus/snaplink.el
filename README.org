@@ -4,8 +4,8 @@ replaces that path with a public URL in place.
 
 Supported link forms in v0.1:
 
-- Org: =[[file:./assets/a.png]]=
-- Org with description: =[[file:./assets/a.png][Screenshot]]=
+- Org: =[[./assets/a.png]]=, =[[./assets/a.png][Screenshot]]=,
+  =[[file:./assets/a.png]]=, =[[file:./assets/a.png][Screenshot]]=
 - Markdown image: =![](./assets/a.png)=
 - Markdown link: =[](./assets/a.png)=
 
