@@ -1,11 +1,13 @@
 * snaplink.el
-=snaplink.el= uploads a local image path at point with =rclone= and
-replaces that path with a public URL in place.
 
-Supported link forms in v0.1:
+[[https://img.shields.io/badge/doom-emacs-blue?style=for-the-badge&link=https%3A%2F%2Fgithub.com%2Fdoomemacs%2Fcore]]
 
-- Org: =[[./assets/a.png]]=, =[[./assets/a.png][Screenshot]]=,
-  =[[file:./assets/a.png]]=, =[[file:./assets/a.png][Screenshot]]=
+=snaplink.el= is a Emacs plugin to upload a local image path at point with =rclone= and
+replace that path with a public URL in place.
+
+Supported link forms:
+
+- Org:  =[[./assets/a.png][]]=, =[[file:./assets/a.png][]]=
 - Markdown image: =![](./assets/a.png)=
 - Markdown link: =[](./assets/a.png)=
 
