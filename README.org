@@ -33,13 +33,13 @@ Path rules:
 Doom Emacs example:
 
 #+begin_src elisp
-;; ~/.doom.d/packages.el
+;; ~/.config/doom/packages.el
 (package! snaplink
   :recipe (:host github :repo "zyw-icarus/snaplink.el"))
 #+end_src
 
 #+begin_src elisp
-;; ~/.doom.d/config.el
+;; ~/.config/doom/config.el
 (use-package! snaplink
   :commands (snaplink-upload-at-point)
   :init
