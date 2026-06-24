@@ -1,42 +1,66 @@
 * snaplink.el
 
 [[https://github.com/doomemacs/core][https://img.shields.io/badge/doom-emacs-blue.svg?style=for-the-badge]]
+[[https://www.gnu.org/software/emacs/][https://img.shields.io/badge/Emacs-30.1%2B-7F5AB6.svg?style=for-the-badge]]
+[[https://rclone.org/][https://img.shields.io/badge/powered%20by-rclone-3F79AD.svg?style=for-the-badge]]
 
-=snaplink.el= is a Emacs plugin to upload a local image path at point with =rclone= and
-replace that path with a public URL in place.
+=snaplink.el= uploads the local image link at point with =rclone=, then replaces
+that local path with its public URL in place.
 
-Supported link forms:
+It is built for notes, posts, and documentation workflows where images start as
+local files and need to become stable public links.
 
-- Org:  =[[./assets/a.png][]]=, =[[file:./assets/a.png][]]=
-- Markdown image: =![](./assets/a.png)=
-- Markdown link: =[](./assets/a.png)=
+** Features
 
-Path rules:
+- Upload the image path under point with =rclone copyto=.
+- Replace only the link target, preserving the surrounding Org or Markdown
+  syntax.
+- Resolve image paths relative to the current buffer's file.
+- Reject absolute paths and parent-directory references for predictable uploads.
+- Limit uploads to image-like extensions by default:
+  =png=, =jpg=, =jpeg=, =gif=, =webp=, =svg=, =avif=.
 
-- Paths are interpreted relative to the current file.
-- =foo/bar.png= and =./foo/bar.png= are supported.
-- Any path containing =../= is rejected.
-- Absolute paths are rejected.
+** Requirements
 
-** Configuration
+- Emacs 30.1 or newer.
+- =rclone= available on =exec-path=.
+- A configured =rclone= remote that can write to your image bucket or storage
+  target.
+- A public base URL that maps to the uploaded objects.
+
+For example, if =snaplink-rclone-remote= is =r2:blog-images= and
+=snaplink-public-base-url= is =https://img.example.com=, then
+=./assets/a.png= is uploaded to =r2:blog-images/assets/a.png= and replaced with
+=https://img.example.com/assets/a.png=.
+
+** Installation
+
+Install directly from Git with =package-vc-install=:
 
 #+begin_src elisp
-;; Install once:
-;; (package-vc-install "https://github.com/zyw-icarus/snaplink.el")
+(package-vc-install "https://github.com/zyw-icarus/snaplink.el")
+#+end_src
 
+Then load and configure it:
+
+#+begin_src elisp
 (require 'snaplink)
 
 (setq snaplink-rclone-remote "r2:your-bucket"
       snaplink-public-base-url "https://img.example.com")
 #+end_src
 
-Doom Emacs example:
+*** Doom Emacs
+
+Add the package recipe:
 
 #+begin_src elisp
 ;; ~/.config/doom/packages.el
 (package! snaplink
   :recipe (:host github :repo "zyw-icarus/snaplink.el"))
 #+end_src
+
+Configure the command and key binding:
 
 #+begin_src elisp
 ;; ~/.config/doom/config.el
@@ -51,9 +75,135 @@ Doom Emacs example:
         snaplink-public-base-url "https://img.example.com"))
 #+end_src
 
-Then run =doom sync= and restart Emacs.
+Run =doom sync=, then restart Emacs.
 
-** Tests
+** Usage
+
+Place point anywhere on a supported local image path and run:
+
+#+begin_src elisp
+M-x snaplink-upload-at-point
+#+end_src
+
+Example:
+
+#+begin_src org
+Before:
+[[./assets/a.png][diagram]]
+
+After:
+[[https://img.example.com/assets/a.png][diagram]]
+#+end_src
+
+Markdown image links work the same way:
+
+#+begin_src markdown
+Before:
+![](./assets/a.png)
+
+After:
+![](https://img.example.com/assets/a.png)
+#+end_src
+
+** Supported Links
+
+| Format         | Example                     |
+|----------------+-----------------------------|
+| Org link       | =[[./assets/a.png]]=        |
+| Org file link  | =[[file:./assets/a.png]]=   |
+| Org described  | =[[./assets/a.png][desc]]=  |
+| Markdown image | =![](./assets/a.png)=       |
+| Markdown link  | =[](./assets/a.png)=        |
+
+** Path Rules
+
+- Paths are interpreted relative to the file visited by the current buffer.
+- =foo/bar.png= and =./foo/bar.png= are supported.
+- Any path containing =../= is rejected.
+- Absolute paths, including =~/foo.png=, are rejected.
+- The local file must exist before upload starts.
+
+These rules keep object keys stable and prevent accidental uploads from outside
+the current document tree.
+
+** Configuration
+
+=snaplink-rclone-remote=
+
+The destination remote used by =rclone copyto=.
+
+#+begin_src elisp
+(setq snaplink-rclone-remote "r2:blog-images")
+#+end_src
+
+=snaplink-public-base-url=
+
+The public URL prefix used to build the replacement link.
+
+#+begin_src elisp
+(setq snaplink-public-base-url "https://img.example.com")
+#+end_src
+
+=snaplink-allowed-extensions=
+
+The list of file extensions that may be uploaded.
+
+#+begin_src elisp
+(setq snaplink-allowed-extensions
+      '("png" "jpg" "jpeg" "gif" "webp" "svg" "avif"))
+#+end_src
+
+** Troubleshooting
+
+=snaplink-rclone-remote is not configured=
+
+Set =snaplink-rclone-remote= to a writable =rclone= destination, such as
+=r2:blog-images=.
+
+=snaplink-public-base-url is not configured=
+
+Set =snaplink-public-base-url= to the public URL that serves uploaded objects,
+such as =https://img.example.com=.
+
+=Point is not on a supported local path=
+
+Move point onto the path portion of a supported Org or Markdown link.
+
+=Local file does not exist=
+
+Check that the path is relative to the current file and that the image exists on
+disk.
+
+=Absolute paths are not supported= or =Parent directory references are not supported=
+
+Use a path inside the current document tree, such as =./assets/a.png=.
+
+=rclone upload failed=
+
+Run the equivalent =rclone copyto= command in a shell to inspect authentication,
+remote name, bucket, and permission issues.
+
+** Development
+
+Run the test suite:
+
+#+begin_src sh
+make test
+#+end_src
+
+Byte-compile the package:
+
+#+begin_src sh
+make compile
+#+end_src
+
+Run package linting when =package-lint= is available:
+
+#+begin_src sh
+make lint
+#+end_src
+
+Equivalent raw test command:
 
 #+begin_src sh
 emacs -Q --batch \
@@ -62,8 +212,6 @@ emacs -Q --batch \
   -f ert-run-tests-batch-and-exit
 #+end_src
 
-Byte compilation:
+** License
 
-#+begin_src sh
-emacs -Q --batch -L . -f batch-byte-compile snaplink.el
-#+end_src
+MIT. See [[file:LICENSE][LICENSE]].
